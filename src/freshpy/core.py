@@ -18,6 +18,7 @@ logger = log_utils.initialize_logging(__name__)
 
 class FreshPy(object):
     """This is the class for the core object leveraged in this library."""
+
     # Define the function that initializes the object instance (i.e. instantiates the object)
     def __init__(self, domain=None, api_key=None):
         """This method instantiates the core Fresh object.
@@ -29,15 +30,17 @@ class FreshPy(object):
 
         # Raise an exception if the domain and API key were not supplied
         if not domain or not api_key:
-            raise errors.exceptions.MissingRequiredDataError('init')
+            raise errors.exceptions.MissingRequiredDataError("init")
 
         # Define the domain
-        domain = f'https://{domain}' if domain and not domain.startswith('http') else domain
-        domain = domain[:-1] if domain.endswith('/') else domain
+        domain = (
+            f"https://{domain}" if domain and not domain.startswith("http") else domain
+        )
+        domain = domain[:-1] if domain.endswith("/") else domain
         self.domain = domain
 
         # Define the base URL
-        self.base_url = f'{domain}/api/v2/'
+        self.base_url = f"{domain}/api/v2/"
 
         # Define the API key
         self.api_key = api_key
@@ -79,10 +82,13 @@ class FreshPy(object):
         :returns: The JSON data from the response or the raw :py:mod:`requests` response.
         :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
         """
-        return api.get_request_with_retries(self, uri, headers, return_json, verify_ssl=verify_ssl)
+        return api.get_request_with_retries(
+            self, uri, headers, return_json, verify_ssl=verify_ssl
+        )
 
     class Agents(object):
         """This class includes methods associated with Freshservice agents."""
+
         def __init__(self, freshpy_object):
             """This method initializes the :py:class:`freshpy.core.freshpy.Tickets` inner class object.
 
@@ -106,7 +112,9 @@ class FreshPy(object):
             :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`,
                      :py:exc:`freshpy.errors.exceptions.InvalidFieldError`
             """
-            return agents_module.get_user_info(self.freshpy_object, lookup_value=lookup_value, verify_ssl=verify_ssl)
+            return agents_module.get_user_info(
+                self.freshpy_object, lookup_value=lookup_value, verify_ssl=verify_ssl
+            )
 
         def get_all_agents(self, only_active=None, only_inactive=None, verify_ssl=True):
             """This function returns data for all agents with an optional filters for active or inactive users.
@@ -122,8 +130,12 @@ class FreshPy(object):
             :returns: JSON data with user data for all agents
             :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
             """
-            return agents_module.get_all_agents(self.freshpy_object, only_active=only_active,
-                                                only_inactive=only_inactive, verify_ssl=verify_ssl)
+            return agents_module.get_all_agents(
+                self.freshpy_object,
+                only_active=only_active,
+                only_inactive=only_inactive,
+                verify_ssl=verify_ssl,
+            )
 
         def get_agent_id(self, email, verify_ssl=True):
             """This function retrieves the Agent ID value for a specific agent.
@@ -139,7 +151,9 @@ class FreshPy(object):
                      :py:exc:`freshpy.errors.exceptions.NotFoundResponseError`,
                      :py:exc:`freshpy.errors.exceptions.InvalidFieldError`
             """
-            return agents_module.get_agent_id(self.freshpy_object, email=email, verify_ssl=verify_ssl)
+            return agents_module.get_agent_id(
+                self.freshpy_object, email=email, verify_ssl=verify_ssl
+            )
 
         def get_assignment_history(self, lookup_value, verify_ssl=True):
             """This function retrieves the user assignment history for a specific agent.
@@ -155,11 +169,13 @@ class FreshPy(object):
                      :py:exc:`freshpy.errors.exceptions.NotFoundResponseError`,
                      :py:exc:`freshpy.errors.exceptions.InvalidFieldError`
             """
-            return agents_module.get_assignment_history(self.freshpy_object, lookup_value=lookup_value,
-                                                        verify_ssl=verify_ssl)
+            return agents_module.get_assignment_history(
+                self.freshpy_object, lookup_value=lookup_value, verify_ssl=verify_ssl
+            )
 
     class Tickets(object):
         """This class includes methods associated with Freshservice tickets."""
+
         def __init__(self, freshpy_object):
             """This method initializes the :py:class:`freshpy.core.freshpy.Tickets` inner class object.
 
@@ -170,7 +186,14 @@ class FreshPy(object):
             """
             self.freshpy_object = freshpy_object
 
-        def get_ticket(self, ticket_number, include=None, verify_ssl=True):
+        def get_ticket(
+            self,
+            ticket_number,
+            include=None,
+            conversations=True,
+            activity=True,
+            verify_ssl=True,
+        ):
             """This method returns the data for a specific ticket.
 
             .. versionchanged:: 2.0.0
@@ -190,12 +213,31 @@ class FreshPy(object):
             :returns: JSON data for the given ticket
             :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
             """
-            return tickets_module.get_ticket(self.freshpy_object, ticket_number=ticket_number, include=include,
-                                             verify_ssl=verify_ssl)
+            return tickets_module.get_ticket(
+                self.freshpy_object,
+                ticket_number=ticket_number,
+                include=include,
+                conversations=conversations,
+                activity=activity,
+                verify_ssl=verify_ssl,
+            )
 
-        def get_tickets(self, include=None, predefined_filter=None, filters=None, filter_logic='AND', requester_id=None,
-                        requester_email=None, ticket_type=None, updated_since=None, ascending=None, descending=None,
-                        per_page=None, page=None, verify_ssl=True):
+        def get_tickets(
+            self,
+            include=None,
+            predefined_filter=None,
+            filters=None,
+            filter_logic="AND",
+            requester_id=None,
+            requester_email=None,
+            ticket_type=None,
+            updated_since=None,
+            ascending=None,
+            descending=None,
+            per_page=None,
+            page=None,
+            verify_ssl=True,
+        ):
             """This method returns a sequence of tickets with optional filters.
 
             .. versionchanged:: 1.1.0
@@ -233,11 +275,22 @@ class FreshPy(object):
             :raises: :py:exc:`freshpy.errors.exceptions.InvalidPredefinedFilterError`,
                      :py:exc:`freshpy.errors.exceptions.APIConnectionError`
             """
-            return tickets_module.get_tickets(self.freshpy_object, include=include, predefined_filter=predefined_filter,
-                                              filters=filters, filter_logic=filter_logic, requester_id=requester_id,
-                                              per_page=per_page, page=page, requester_email=requester_email,
-                                              ticket_type=ticket_type, updated_since=updated_since, ascending=ascending,
-                                              descending=descending, verify_ssl=verify_ssl)
+            return tickets_module.get_tickets(
+                self.freshpy_object,
+                include=include,
+                predefined_filter=predefined_filter,
+                filters=filters,
+                filter_logic=filter_logic,
+                requester_id=requester_id,
+                per_page=per_page,
+                page=page,
+                requester_email=requester_email,
+                ticket_type=ticket_type,
+                updated_since=updated_since,
+                ascending=ascending,
+                descending=descending,
+                verify_ssl=verify_ssl,
+            )
 
     def __del__(self):
         """This method fully destroys the instance.
