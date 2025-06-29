@@ -14,14 +14,34 @@ from .utils import core_utils, log_utils
 logger = log_utils.initialize_logging(__name__)
 
 # Define constants
-VALID_PREDEFINED_FILTERS = ['new_and_my_open', 'watching', 'spam', 'deleted']
-SUPPORTED_FILTER_FIELDS = ['agent_id', 'group_id', 'priority', 'status', 'impact', 'urgency', 'tag', 'due_by',
-                           'fr_due_by', 'created_at']
-FILTER_LOGIC_OPERATORS = ['AND', 'OR']
+VALID_PREDEFINED_FILTERS = ["new_and_my_open", "watching", "spam", "deleted"]
+SUPPORTED_FILTER_FIELDS = [
+    "agent_id",
+    "group_id",
+    "priority",
+    "status",
+    "impact",
+    "urgency",
+    "tag",
+    "due_by",
+    "fr_due_by",
+    "created_at",
+]
+FILTER_LOGIC_OPERATORS = ["AND", "OR"]
 
 
-def get_ticket(freshpy_object, ticket_number, include=None, verify_ssl=True):
+def get_ticket(
+    freshpy_object,
+    ticket_number,
+    conversations=False,
+    activity=False,
+    include=None,
+    verify_ssl=True,
+):
     """This function returns the data for a specific ticket.
+
+    .. versionchanged:: 1.2.0
+       Added the ability to optionally fetch **full** conversations and activity
 
     .. versionchanged:: 1.1.0
        Added the ability to disable SSL verification on API calls.
@@ -39,14 +59,110 @@ def get_ticket(freshpy_object, ticket_number, include=None, verify_ssl=True):
     :returns: JSON data for the given ticket
     :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
     """
-    uri = f'tickets/{ticket_number}'
+    uri = f"tickets/{ticket_number}"
     uri += _parse_constraints(_include=include)
-    return api.get_request_with_retries(freshpy_object, uri, verify_ssl=verify_ssl)
+    ticket = api.get_request_with_retries(freshpy_object, uri, verify_ssl=verify_ssl)
+    if conversations:
+        ticket["conversations"] = get_conversations(
+            freshpy_object, ticket_number, verify_ssl=verify_ssl
+        )
+    if activity:
+        ticket["activity"] = get_activity(
+            freshpy_object, ticket_number, verify_ssl=verify_ssl
+        )
+    return ticket
 
 
-def get_tickets(freshpy_object, include=None, predefined_filter=None, filters=None, filter_logic='AND',
-                requester_id=None, requester_email=None, ticket_type=None, updated_since=None, ascending=None,
-                descending=None, per_page=None, page=None, verify_ssl=True):
+def get_conversations(freshpy_object, ticket_number, verify_ssl=True):
+    """This function returns all conversations for a specific ticket.
+
+    This function retrieves all conversations associated with a ticket using page-based pagination.
+    It automatically handles pagination to ensure all conversations are returned, not just the first page.
+
+    .. versionadded:: 1.2.0
+
+    :param freshpy_object: The core :py:class:`freshpy.FreshPy` object
+    :type freshpy_object: class[freshpy.FreshPy]
+    :param ticket_number: The ticket number for which to return conversations
+    :type ticket_number: str, int
+    :param verify_ssl: Determines if SSL verification should occur (``True`` by default)
+    :type verify_ssl: bool
+    :returns: A list of JSON objects containing all conversations for the ticket
+    :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
+    """
+    conversations = []
+    page = 1
+    pageLimit = 100
+    while page < pageLimit:
+        uri = f"tickets/{ticket_number}/conversations?page={page}"
+        response = api.get_request_with_retries(
+            freshpy_object, uri, verify_ssl=verify_ssl
+        )
+        if "conversations" not in response or not response["conversations"]:
+            break
+        conversations.extend(response["conversations"])
+        page += 1
+    return conversations
+
+
+def get_activity(freshpy_object, ticket_number, verify_ssl=True):
+    """This function returns all activity for a specific ticket.
+
+    This function retrieves all activity associated with a ticket using token-based pagination.
+    It automatically handles pagination using the next_page_url token to ensure all activities
+    are returned, not just the first 20 entries.
+
+    .. versionadded:: 1.2.0
+
+    :param freshpy_object: The core :py:class:`freshpy.FreshPy` object
+    :type freshpy_object: class[freshpy.FreshPy]
+    :param ticket_number: The ticket number for which to return activity
+    :type ticket_number: str, int
+    :param verify_ssl: Determines if SSL verification should occur (``True`` by default)
+    :type verify_ssl: bool
+    :returns: A list of JSON objects containing all activities for the ticket
+    :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
+    """
+    activities = []
+    uri = f"tickets/{ticket_number}/activities"
+    page = 0
+    pageLimit = 100
+    while page < pageLimit:
+        response = api.get_request_with_retries(
+            freshpy_object, uri, verify_ssl=verify_ssl
+        )
+        if "activities" not in response or not response["activities"]:
+            break
+        activities.extend(response["activities"])
+        if "next_page_url" not in response or not response["next_page_url"]:
+            break
+        # Extract start_token from next_page_url
+        next_url = response["next_page_url"]
+        if "start_token=" in next_url:
+            start_token = next_url.split("start_token=")[1]
+            uri = f"tickets/{ticket_number}/activities?start_token={start_token}"
+            page += 1
+        else:
+            break
+    return activities
+
+
+def get_tickets(
+    freshpy_object,
+    include=None,
+    predefined_filter=None,
+    filters=None,
+    filter_logic="AND",
+    requester_id=None,
+    requester_email=None,
+    ticket_type=None,
+    updated_since=None,
+    ascending=None,
+    descending=None,
+    per_page=None,
+    page=None,
+    verify_ssl=True,
+):
     """This function returns a sequence of tickets with optional filters.
 
     .. versionchanged:: 1.1.0
@@ -85,18 +201,26 @@ def get_tickets(freshpy_object, include=None, predefined_filter=None, filters=No
     :raises: :py:exc:`freshpy.errors.exceptions.InvalidPredefinedFilterError`,
              :py:exc:`freshpy.errors.exceptions.APIConnectionError`
     """
-    uri = 'tickets'
+    uri = "tickets"
     if filters:
         uri += _parse_filters(filters, filter_logic)
     else:
-        uri += _parse_constraints(_include=include, _predefined_filter=predefined_filter, _requester_id=requester_id,
-                                  _requester_email=requester_email, _ticket_type=ticket_type,
-                                  _updated_since=updated_since, _ascending=ascending, _descending=descending,
-                                  _per_page=per_page, _page=page)
+        uri += _parse_constraints(
+            _include=include,
+            _predefined_filter=predefined_filter,
+            _requester_id=requester_id,
+            _requester_email=requester_email,
+            _ticket_type=ticket_type,
+            _updated_since=updated_since,
+            _ascending=ascending,
+            _descending=descending,
+            _per_page=per_page,
+            _page=page,
+        )
     return api.get_request_with_retries(freshpy_object, uri, verify_ssl=verify_ssl)
 
 
-def _parse_filters(_filters=None, _logic='AND'):
+def _parse_filters(_filters=None, _logic="AND"):
     _filters = {} if not _filters else _filters
     if _logic.upper() not in FILTER_LOGIC_OPERATORS:
         raise errors.exceptions.InvalidFilterLogicError(value=_logic)
@@ -104,20 +228,29 @@ def _parse_filters(_filters=None, _logic='AND'):
         _filters = core_utils.url_encode(_filters)
         _uri_segment = f'/filter?query="{_filters}"'
     else:
-        _uri_segment = '/filter?query='
-        _filter = ''
+        _uri_segment = "/filter?query="
+        _filter = ""
         for _idx, (_field, _value) in enumerate(_filters.items()):
-            _filter += f'{_field}:{_value}'
+            _filter += f"{_field}:{_value}"
             if _idx < (len(_filters) - 1):
-                _filter += f' {_logic.upper()} '
+                _filter += f" {_logic.upper()} "
         _filter = core_utils.url_encode(_filter)
         _uri_segment += f'"{_filter}"'
     return _uri_segment
 
 
-def _parse_constraints(_include=None, _predefined_filter=None, _requester_id=None, _requester_email=None,
-                       _ticket_type=None, _updated_since=None, _ascending=None, _descending=None, _per_page=None,
-                       _page=None):
+def _parse_constraints(
+    _include=None,
+    _predefined_filter=None,
+    _requester_id=None,
+    _requester_email=None,
+    _ticket_type=None,
+    _updated_since=None,
+    _ascending=None,
+    _descending=None,
+    _per_page=None,
+    _page=None,
+):
     """This function parses any constraints into a properly constructed query string.
 
     .. versionadded:: 1.0.0
@@ -145,34 +278,52 @@ def _parse_constraints(_include=None, _predefined_filter=None, _requester_id=Non
     :returns: The fully constructed query string
     :raises: :py:exc:`freshpy.errors.exceptions.InvalidPredefinedFilterError`
     """
-    _constraints = ''
+    _constraints = ""
     if _include:
         # TODO: Perform a check to verify support for the provided include value(s)
         if not isinstance(_include, str):
-            _include = ','.join(_include)
-        _constraints = core_utils.construct_query_string(_constraints, f'include={_include}')
+            _include = ",".join(_include)
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"include={_include}"
+        )
     if _predefined_filter:
         if _predefined_filter not in VALID_PREDEFINED_FILTERS:
             if isinstance(_predefined_filter, str):
-                raise errors.exceptions.InvalidPredefinedFilterError(value=_predefined_filter)
+                raise errors.exceptions.InvalidPredefinedFilterError(
+                    value=_predefined_filter
+                )
             raise errors.exceptions.InvalidPredefinedFilterError()
-        _constraints = core_utils.construct_query_string(_constraints, f'filter={_predefined_filter}')
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"filter={_predefined_filter}"
+        )
     if _requester_id:
-        _constraints = core_utils.construct_query_string(_constraints, f'requester_id={_requester_id}')
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"requester_id={_requester_id}"
+        )
     if _requester_email:
         _requester_email = core_utils.url_encode(_requester_email)
-        _constraints = core_utils.construct_query_string(_constraints, f'requester_email={_requester_email}')
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"requester_email={_requester_email}"
+        )
     if _ticket_type:
-        _ticket_type = _ticket_type.replace(' ', '+')
-        _constraints = core_utils.construct_query_string(_constraints, f'type={_ticket_type}')
+        _ticket_type = _ticket_type.replace(" ", "+")
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"type={_ticket_type}"
+        )
     if _updated_since:
-        _constraints = core_utils.construct_query_string(_constraints, f'updated_since={_updated_since}')
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"updated_since={_updated_since}"
+        )
     if _ascending:
-        _constraints = core_utils.construct_query_string(_constraints, 'order_type=asc')
+        _constraints = core_utils.construct_query_string(_constraints, "order_type=asc")
     if _descending:
-        _constraints = core_utils.construct_query_string(_constraints, 'order_type=desc')
+        _constraints = core_utils.construct_query_string(
+            _constraints, "order_type=desc"
+        )
     if _per_page:
-        _constraints = core_utils.construct_query_string(_constraints, f'per_page={_per_page}')
+        _constraints = core_utils.construct_query_string(
+            _constraints, f"per_page={_per_page}"
+        )
     if _page:
-        _constraints = core_utils.construct_query_string(_constraints, f'page={_page}')
+        _constraints = core_utils.construct_query_string(_constraints, f"page={_page}")
     return _constraints
