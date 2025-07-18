@@ -92,8 +92,8 @@ def get_conversations(freshpy_object, ticket_number, verify_ssl=True):
     """
     conversations = []
     page = 1
-    pageLimit = 100
-    while page < pageLimit:
+    page_limit = 100
+    while page < page_limit:
         uri = f"tickets/{ticket_number}/conversations?page={page}"
         response = api.get_request_with_retries(
             freshpy_object, uri, verify_ssl=verify_ssl

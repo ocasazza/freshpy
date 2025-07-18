@@ -8,6 +8,8 @@
 """
 
 import requests
+import time
+import random
 
 from . import errors
 from .utils import log_utils
@@ -21,7 +23,7 @@ def define_headers():
 
     .. versionadded:: 1.0.0
     """
-    headers = {'Content-Type': 'application/json'}
+    headers = {"Content-Type": "application/json"}
     return headers
 
 
@@ -30,11 +32,13 @@ def define_auth(api_key):
 
     .. versionadded:: 1.0.0
     """
-    credentials = (api_key, 'X')
+    credentials = (api_key, "X")
     return credentials
 
 
-def get_request_with_retries(fresh_object, uri, headers=None, return_json=True, verify_ssl=True):
+def get_request_with_retries(
+    fresh_object, uri, headers=None, return_json=True, verify_ssl=True
+):
     """This function performs a GET request and will retry several times if a failure occurs.
 
     .. versionchanged:: 2.0.0
@@ -70,28 +74,35 @@ def get_request_with_retries(fresh_object, uri, headers=None, return_json=True, 
     retries, response = 0, None
     while retries <= 5:
         try:
-            response = requests.get(query_url, headers=headers, auth=credentials, verify=verify_ssl)
+            response = requests.get(
+                query_url, headers=headers, auth=credentials, verify=verify_ssl
+            )
             break
         except Exception as exc_msg:
-            _report_failed_attempt(exc_msg, 'get', retries)
+            _report_failed_attempt(exc_msg, "get", retries)
             retries += 1
     if retries == 6:
         _raise_exception_for_repeated_timeouts()
     if return_json:
+        if response.status_code == 429:
+            delay = (5**i) + (random.random() * 5)
+            print(f"Rate detected. Retrying in {delay:.2f}s")
+            time.sleep(delay)
+
         if response.status_code == 404:
             response = {
-                'status': 'error',
-                'status_code': 404,
-                'error_message': 'Data not found',
+                "status": "error",
+                "status_code": 404,
+                "error_message": "Data not found",
             }
         else:
             try:
                 response = response.json()
             except Exception as exc_msg:
                 response = {
-                    'status': 'exception',
-                    'status_code': None,
-                    'error_message': exc_msg,
+                    "status": "exception",
+                    "status_code": None,
+                    "error_message": exc_msg,
                 }
     return response
 
@@ -112,11 +123,13 @@ def _report_failed_attempt(_exc_msg, _request_type, _retries):
     :returns: None
     """
     _exc_name = type(_exc_msg).__name__
-    if 'connect' not in _exc_name.lower():
+    if "connect" not in _exc_name.lower():
         raise RuntimeError(f"{_exc_name}: {_exc_msg}")
     _current_attempt = f"(Attempt {_retries} of 5)"
-    _error_msg = f"The {_request_type.upper()} request has failed with the following exception: " + \
-                 f"{_exc_name}: {_exc_msg} {_current_attempt}"
+    _error_msg = (
+        f"The {_request_type.upper()} request has failed with the following exception: "
+        + f"{_exc_name}: {_exc_msg} {_current_attempt}"
+    )
     errors.handlers.eprint(f"{_error_msg}\n{_exc_name}: {_exc_msg}\n")
 
 
@@ -128,6 +141,8 @@ def _raise_exception_for_repeated_timeouts():
     :returns: None
     :raises: :py:exc:`freshpy.errors.exceptions.APIConnectionError`
     """
-    _failure_msg = "The script was unable to complete successfully after five consecutive API timeouts. " + \
-                   "Please run the script again or contact Freshservice Support for further assistance."
+    _failure_msg = (
+        "The script was unable to complete successfully after five consecutive API timeouts. "
+        + "Please run the script again or contact Freshservice Support for further assistance."
+    )
     raise errors.exceptions.APIConnectionError(_failure_msg)

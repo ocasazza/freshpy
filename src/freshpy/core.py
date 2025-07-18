@@ -99,6 +99,20 @@ class FreshPy(object):
             """
             self.freshpy_object = freshpy_object
 
+        def get_requesters(self, verify_ssl=True):
+            """This method returns all requesters for a FreshPy projct.
+
+            Todo: refactor this into a HelpDesk class / module
+
+            .. versionadded:: 2.0.0
+
+            :param freshpy_object: The core :py:class:`freshpy.FreshPy` object
+            :type freshpy_object: class[freshpy.FreshPy]
+            """
+            return agents_module.get_requesters(
+                self.freshpy_object, verify_ssl=verify_ssl
+            )
+
         def get_user_info(self, lookup_value, verify_ssl=True):
             """This function retrieves user data for a specific agent.
 
