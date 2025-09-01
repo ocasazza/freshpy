@@ -98,9 +98,21 @@ def get_conversations(freshpy_object, ticket_number, verify_ssl=True):
         response = api.get_request_with_retries(
             freshpy_object, uri, verify_ssl=verify_ssl
         )
-        if "conversations" not in response or not response["conversations"]:
+
+        # Handle both response formats: direct list or wrapped in dictionary
+        if isinstance(response, list):
+            # API returned conversations directly as a list
+            if not response:
+                break
+            conversations.extend(response)
+        elif isinstance(response, dict):
+            # API returned conversations wrapped in a dictionary
+            if "conversations" not in response or not response["conversations"]:
+                break
+            conversations.extend(response["conversations"])
+        else:
+            # Unexpected response format
             break
-        conversations.extend(response["conversations"])
         page += 1
     return conversations
 
@@ -131,18 +143,33 @@ def get_activity(freshpy_object, ticket_number, verify_ssl=True):
         response = api.get_request_with_retries(
             freshpy_object, uri, verify_ssl=verify_ssl
         )
-        if "activities" not in response or not response["activities"]:
-            break
-        activities.extend(response["activities"])
-        if "next_page_url" not in response or not response["next_page_url"]:
-            break
-        # Extract start_token from next_page_url
-        next_url = response["next_page_url"]
-        if "start_token=" in next_url:
-            start_token = next_url.split("start_token=")[1]
-            uri = f"tickets/{ticket_number}/activities?start_token={start_token}"
+
+        # Handle both response formats: direct list or wrapped in dictionary
+        if isinstance(response, list):
+            # API returned activities directly as a list
+            if not response:
+                break
+            activities.extend(response)
+            # For list responses, we can't check next_page_url, so just increment page
             page += 1
+        elif isinstance(response, dict):
+            # API returned activities wrapped in a dictionary
+            if "activities" not in response or not response["activities"]:
+                break
+            activities.extend(response["activities"])
+            # Handle pagination for dictionary responses
+            if "next_page_url" not in response or not response["next_page_url"]:
+                break
+            # Extract start_token from next_page_url
+            next_url = response["next_page_url"]
+            if "start_token=" in next_url:
+                start_token = next_url.split("start_token=")[1]
+                uri = f"tickets/{ticket_number}/activities?start_token={start_token}"
+                page += 1
+            else:
+                break
         else:
+            # Unexpected response format
             break
     return activities
 

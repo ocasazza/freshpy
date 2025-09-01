@@ -200,6 +200,20 @@ class FreshPy(object):
             """
             self.freshpy_object = freshpy_object
 
+        def get_ticket_activity(
+            self,
+            ticket_number,
+            verify_ssl=True,
+        ):
+            return tickets_module.get_activity(freshpy_object=self.freshpy_object, ticket_number=ticket_number, verify_ssl=verify_ssl)
+
+        def get_ticket_conversations(
+            self,
+            ticket_number,
+            verify_ssl=True,
+        ):
+            return tickets_module.get_conversations(freshpy_object=self.freshpy_object, ticket_number=ticket_number, verify_ssl=verify_ssl)
+
         def get_ticket(
             self,
             ticket_number,
