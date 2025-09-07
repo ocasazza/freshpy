@@ -85,7 +85,7 @@ def get_request_with_retries(
         _raise_exception_for_repeated_timeouts()
     if return_json:
         if response.status_code == 429:
-            delay = (5**i) + (random.random() * 5)
+            delay = (5**retries) + (random.random() * 5)
             print(f"Rate detected. Retrying in {delay:.2f}s")
             time.sleep(delay)
 
