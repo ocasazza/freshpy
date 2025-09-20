@@ -88,7 +88,6 @@ def get_request_with_retries(
             delay = (5**retries) + (random.random() * 5)
             print(f"Rate detected. Retrying in {delay:.2f}s")
             time.sleep(delay)
-
         if response.status_code == 404:
             response = {
                 "status": "error",
@@ -102,7 +101,7 @@ def get_request_with_retries(
                 response = {
                     "status": "exception",
                     "status_code": None,
-                    "error_message": exc_msg,
+                    "error_message": str(exc_msg),
                 }
     return response
 
